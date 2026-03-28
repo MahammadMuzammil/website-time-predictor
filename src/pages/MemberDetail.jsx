@@ -3,9 +3,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Trash2, IndianRupee, Smartphone, Banknote, Building2, CreditCard, MoreHorizontal, ChevronRight, CalendarDays, User } from "lucide-react";
+import { ArrowLeft, Trash2, IndianRupee, Smartphone, Banknote, Building2, CreditCard, MoreHorizontal, ChevronRight, CalendarDays, User, Download } from "lucide-react";
 import { getMembers } from "@/lib/chit-store";
-import { getInstallments, deleteInstallment } from "@/lib/installment-store";
+import { getInstallments, deleteInstallment, getTransactionsByInstallmentIds } from "@/lib/installment-store";
 import CreateInstallmentDialog from "@/components/CreateInstallmentDialog";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -18,6 +18,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const paymentMethodIcon = {
   "PhonePe": <Smartphone className="h-3.5 w-3.5" />,
@@ -27,12 +29,33 @@ const paymentMethodIcon = {
   "Other": <MoreHorizontal className="h-3.5 w-3.5" />,
 };
 
+// Circular progress SVG
+const CircleProgress = ({ percent, completed }) => {
+  const r = 16;
+  const circ = 2 * Math.PI * r;
+  const pct = completed ? 100 : Math.min(100, Math.round(percent));
+  const offset = circ - (pct / 100) * circ;
+  const color = pct === 100 ? "#16a34a" : pct > 50 ? "#f59e0b" : "#94a3b8";
+  return (
+    <svg width="44" height="44" viewBox="0 0 44 44" className="shrink-0">
+      <circle cx="22" cy="22" r={r} fill="none" stroke="#e5e7eb" strokeWidth="4" />
+      <circle cx="22" cy="22" r={r} fill="none" stroke={color} strokeWidth="4"
+        strokeDasharray={circ} strokeDashoffset={offset}
+        strokeLinecap="round" transform="rotate(-90 22 22)" />
+      <text x="22" y="26" textAnchor="middle" fontSize="9" fontWeight="bold" fill={color}>
+        {pct}%
+      </text>
+    </svg>
+  );
+};
+
 const MemberDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [member, setMember] = useState(null);
   const [installments, setInstallments] = useState([]);
+  const [txMap, setTxMap] = useState({});
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const refresh = () => {
@@ -40,7 +63,11 @@ const MemberDetail = () => {
     const members = getMembers();
     const found = members.find((m) => m.id === id) ?? null;
     setMember(found);
-    if (found) setInstallments(getInstallments(id));
+    if (found) {
+      const insts = getInstallments(id);
+      setInstallments(insts);
+      setTxMap(getTransactionsByInstallmentIds(insts.map((i) => i.id)));
+    }
   };
 
   useEffect(() => { refresh(); }, [id]);
@@ -52,7 +79,46 @@ const MemberDetail = () => {
     refresh();
   };
 
-  const totalPaid = installments.reduce((sum, i) => sum + i.amount, 0);
+  const totalPaid = Object.values(txMap).flat().reduce((sum, t) => sum + t.amount, 0);
+
+  const downloadReport = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Member Installment Report", 14, 18);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Member: ${member.name}`, 14, 28);
+    if (member.phone) doc.text(`Phone: ${member.phone}`, 14, 34);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, member.phone ? 40 : 34);
+
+    let grandPaid = 0, grandPending = 0;
+    const rows = installments.map((inst, i) => {
+      const paid = (txMap[inst.id] ?? []).reduce((s, t) => s + t.amount, 0);
+      const pending = Math.max(0, (inst.targetAmount ?? 0) - paid);
+      grandPaid += paid;
+      grandPending += pending;
+      return [
+        `Installment ${i + 1}`,
+        new Date(inst.date).toLocaleDateString("en-GB"),
+        `Rs.${paid.toLocaleString()}`,
+        `Rs.${pending.toLocaleString()}`,
+      ];
+    });
+
+    autoTable(doc, {
+      startY: member.phone ? 48 : 42,
+      head: [["Installment", "Date", "Total Payment", "Pending"]],
+      body: rows,
+      foot: [["", "Grand Total", `Rs.${grandPaid.toLocaleString()}`, `Rs.${grandPending.toLocaleString()}`]],
+      headStyles: { fillColor: [22, 163, 74] },
+      footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: "bold" },
+      styles: { fontSize: 9 },
+    });
+
+    doc.save(`${member.name}-installments-report.pdf`);
+  };
 
   if (!member) {
     return (
@@ -86,13 +152,19 @@ const MemberDetail = () => {
               )}
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-bold leading-tight truncate">{member.name}</h1>
-                <p className="text-xs text-muted-foreground">
-                  Since {new Date(member.joinedAt).toLocaleDateString()}
-                </p>
+                <p className="text-xs text-muted-foreground">Since {new Date(member.joinedAt).toLocaleDateString()}</p>
               </div>
             </div>
           </div>
-          <CreateInstallmentDialog memberId={member.id} onAdded={refresh} />
+          <div className="flex items-center gap-2">
+            {installments.length > 0 && (
+              <Button variant="outline" onClick={downloadReport} className="gap-2">
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Download Report</span>
+              </Button>
+            )}
+            <CreateInstallmentDialog memberId={member.id} onAdded={refresh} />
+          </div>
         </div>
       </header>
 
@@ -134,9 +206,7 @@ const MemberDetail = () => {
             </CardHeader>
             <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
               <p className="text-sm font-medium">
-                {installments.length > 0
-                  ? new Date(installments[0].date).toLocaleDateString()
-                  : "—"}
+                {installments.length > 0 ? new Date(installments[0].date).toLocaleDateString() : "—"}
               </p>
             </CardContent>
           </Card>
@@ -155,46 +225,50 @@ const MemberDetail = () => {
                   <IndianRupee className="h-6 w-6 sm:h-7 sm:w-7 text-muted-foreground" />
                 </div>
                 <h3 className="mb-1 text-base sm:text-lg font-semibold">No installments yet</h3>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Create the first installment for this member.
-                </p>
+                <p className="mb-4 text-sm text-muted-foreground">Create the first installment for this member.</p>
                 <CreateInstallmentDialog memberId={member.id} onAdded={refresh} />
               </div>
             ) : (
               <div className="space-y-2">
-                {installments.map((inst, i) => (
-                  <div
-                    key={inst.id}
-                    className="flex items-center justify-between rounded-lg border bg-card p-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => navigate(`/installment/${inst.id}`)}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xs text-muted-foreground shrink-0">#{i + 1}</span>
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{inst.description}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                          <span>{new Date(inst.date).toLocaleDateString()}</span>
-                          <span className="flex items-center gap-1">
-                            {paymentMethodIcon[inst.paymentMethod] ?? paymentMethodIcon["Other"]}
-                            {inst.paymentMethod}
-                          </span>
+                {installments.map((inst) => {
+                  const subTxs = txMap[inst.id] ?? [];
+                  const subTotal = subTxs.reduce((s, t) => s + t.amount, 0);
+                  const pct = (inst.targetAmount ?? inst.amount) > 0 ? (subTotal / (inst.targetAmount ?? inst.amount)) * 100 : 0;
+                  return (
+                    <div
+                      key={inst.id}
+                      className="flex items-center justify-between rounded-lg border bg-card p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => navigate(`/installment/${inst.id}`)}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <CircleProgress percent={pct} completed={inst.completed} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm truncate">{inst.description}</p>
+                            {inst.completed && (
+                              <Badge className="text-xs bg-green-100 text-green-700 border-green-300 shrink-0">Completed</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                            <span>{new Date(inst.date).toLocaleDateString("en-GB")}</span>
+                          </div>
                         </div>
                       </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <p className="font-bold text-base">₹{subTotal.toLocaleString()}</p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => { e.stopPropagation(); setConfirmDelete({ id: inst.id }); }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <p className="font-bold text-base">₹{inst.amount.toLocaleString()}</p>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={(e) => { e.stopPropagation(); setConfirmDelete({ id: inst.id }); }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -211,10 +285,7 @@ const MemberDetail = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>No</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Yes, Delete
             </AlertDialogAction>
           </AlertDialogFooter>

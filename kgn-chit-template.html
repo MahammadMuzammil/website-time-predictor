@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>K G N CHITS - 12 Lacks</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      padding: 20px;
+      background: #fff;
+    }
+
+    h1 {
+      text-align: center;
+      background-color: #2e7d32;
+      color: #fff;
+      padding: 14px;
+      font-size: 18px;
+      letter-spacing: 2px;
+      margin-bottom: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0;
+    }
+
+    thead tr {
+      background-color: #e8f5e9;
+    }
+
+    th {
+      border: 1px solid #a5d6a7;
+      padding: 8px 6px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 11px;
+      color: #1b5e20;
+    }
+
+    td {
+      border: 1px solid #c8e6c9;
+      padding: 5px 6px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    td.serial {
+      color: #1565c0;
+      font-weight: bold;
+    }
+
+    td.not-lifter {
+      color: #388e3c;
+      font-weight: 600;
+    }
+
+    td.lifter {
+      color: #e53935;
+      font-weight: 600;
+    }
+
+    td.collected {
+      color: #388e3c;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) { background-color: #f9fbe7; }
+    tr:nth-child(odd)  { background-color: #ffffff; }
+
+    input[type="text"] {
+      width: 100%;
+      border: none;
+      background: transparent;
+      font-size: 12px;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      outline: none;
+      color: #333;
+    }
+
+    input[type="text"]:focus {
+      background: #fffde7;
+      border-radius: 3px;
+    }
+
+    @media print {
+      body { padding: 10px; }
+      input[type="text"] {
+        border-bottom: 1px solid #aaa;
+      }
+      input[type="text"]:focus { background: transparent; }
+      .no-print { display: none; }
+    }
+
+    .print-btn {
+      display: block;
+      margin: 16px auto;
+      padding: 10px 28px;
+      background: #2e7d32;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .print-btn:hover { background: #1b5e20; }
+  </style>
+</head>
+<body>
+
+  <h1>K G N CHITS 12 LACKS</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th>SERIEL NO</th>
+        <th>MONTH</th>
+        <th>NAMES</th>
+        <th>CHIT NOT LIFTER</th>
+        <th>CHIT LIFTER</th>
+        <th>AMOUNT COLLECTED BY</th>
+        <th>COMISSION</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+  <button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+
+  <script>
+    const rows = [
+      { no: "01", notLifter: "56,000/-" },
+      { no: "02", notLifter: "55,000/-" },
+      { no: "03", notLifter: "54,000/-" },
+      { no: "04", notLifter: "53,000/-" },
+      { no: "05", notLifter: "52,000/-" },
+      { no: "06", notLifter: "51,000/-" },
+      { no: "07", notLifter: "50,000/-" },
+      { no: "08", notLifter: "49,000/-" },
+      { no: "09", notLifter: "48,000/-" },
+      { no: "10", notLifter: "47,000/-" },
+      { no: "11", notLifter: "46,000/-" },
+      { no: "12", notLifter: "45,000/-" },
+      { no: "13", notLifter: "44,000/-" },
+      { no: "14", notLifter: "43,000/-" },
+      { no: "15", notLifter: "42,000/-" },
+      { no: "16", notLifter: "41,000/-" },
+      { no: "17", notLifter: "40,000/-" },
+      { no: "18", notLifter: "39,000/-" },
+      { no: "19", notLifter: "38,000/-" },
+      { no: "20", notLifter: "37,000/-" },
+      { no: "21", notLifter: "36,000/-" },
+      { no: "22", notLifter: "35,000/-" },
+      { no: "23", notLifter: "34,000/-" },
+    ];
+
+    const tbody = document.getElementById("tableBody");
+    rows.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="serial">${r.no}</td>
+        <td><input type="text" placeholder="Month" /></td>
+        <td><input type="text" placeholder="Name" /></td>
+        <td class="not-lifter">${r.notLifter}</td>
+        <td class="lifter">60,000/-</td>
+        <td class="collected">12,00,000/-</td>
+        <td>12,000/-</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  </script>
+
+</body>
+</html>

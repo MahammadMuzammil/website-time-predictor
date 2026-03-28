@@ -53,6 +53,15 @@ export function getInstallmentTransactions(installmentId) {
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 }
 
+// Returns a map of { [installmentId]: transactions[] } for a set of installment ids
+export function getTransactionsByInstallmentIds(installmentIds) {
+  const all = getAllInstallmentTransactions();
+  const map = {};
+  installmentIds.forEach((id) => { map[id] = []; });
+  all.forEach((t) => { if (map[t.installmentId]) map[t.installmentId].push(t); });
+  return map;
+}
+
 export function addInstallmentTransaction(data) {
   const all = getAllInstallmentTransactions();
   const item = { ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
